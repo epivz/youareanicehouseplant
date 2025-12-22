@@ -99,7 +99,7 @@
 </div>
 
 <script>
-  // Firebase
+  // Firebase initialization
   firebase.initializeApp({
     apiKey: "AIzaSyBQa3GnBvhAPPLGWjdzdBsrcZMexuaeuhY",
     authDomain: "youareanicehouseplant.firebaseapp.com",
@@ -196,7 +196,6 @@
     voiceUsersRef.child(myId).set(true);
     voiceUsersRef.child(myId).onDisconnect().remove();
 
-    // Listen for signals
     voiceSignalsRef.on("child_added", async snapshot=>{
       const data=snapshot.val();
       if(data.to!==myId) return;
@@ -226,7 +225,6 @@
       }
     });
 
-    // Create offers to existing users
     voiceUsersRef.once("value").then(snapshot=>{
       snapshot.forEach(child=>{
         const userId=child.key;
@@ -247,7 +245,7 @@
     });
   };
 
-  leaveBtn.onclick = ()=>{
+  leaveBtn.onclick = () => {
     leaveBtn.disabled=true; joinBtn.disabled=false;
     Object.values(peers).forEach(pc=>pc.close());
     Object.keys(peers).forEach(k=>delete peers[k]);
@@ -258,4 +256,5 @@
 </script>
 </body>
 </html>
+
 
