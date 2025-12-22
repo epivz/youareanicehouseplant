@@ -44,8 +44,8 @@
     #msg, #username { width: calc(100% - 20px); padding: 8px; margin-bottom: 5px; }
     button { padding: 6px 10px; margin-right: 5px; }
 
-    #plant-chat-title { font-family: 'Pacifico', cursive; color: green; }
-    #plant-chat-container { border: 2px solid green; padding: 10px; border-radius: 10px; margin-top: 20px; }
+    #plant-chat-title, #voice-chat-title { font-family: 'Pacifico', cursive; color: green; }
+    #plant-chat-container, #voice-chat-container { border: 2px solid green; padding: 10px; border-radius: 10px; margin-top: 20px; }
 
     #changelog { border-top: 2px dashed green; padding-top: 10px; margin-top: 40px; }
     #changelog h3 { color: green; font-family: 'Pacifico', cursive; }
@@ -64,6 +64,7 @@
 <nav>
   <a href="#home">Home</a>
   <a href="#plant-chat-container">Plant Chat</a>
+  <a href="#voice-chat-container">Voice Chat</a>
   <a href="#changelog">Changelog</a>
 </nav>
 
@@ -98,11 +99,20 @@
   </div>
 </div>
 
+<!-- Voice Chat -->
+<div id="voice-chat-container">
+  <h2 id="voice-chat-title">🎙 Plant Voice Chat</h2>
+  <button id="joinBtn">Join Voice Chat</button>
+  <button id="leaveBtn" disabled>Leave Voice Chat</button>
+  <div id="voices"></div>
+</div>
+
 <!-- Changelog -->
 <div id="changelog">
   <h3>🌱 Changelog</h3>
   <ul>
     <li><strong>2025-12-22:</strong> Added GIF-enabled global chat (Tenor search) with cooldown and last 100 messages.</li>
+    <li><strong>2025-12-22:</strong> Added real-time voice chat prototype using WebRTC + Firebase.</li>
   </ul>
 </div>
 
@@ -118,6 +128,7 @@
     appId: "1:889517708282:web:f5768dbf0582db31f68a43"
   });
 
+  // ---------------- Text + GIF Chat ----------------
   const db = firebase.database();
   const messagesRef = db.ref("messages");
 
@@ -130,60 +141,101 @@
   let lastSent = 0;
   const COOLDOWN = 3000;
 
-  // Send message
-  function send(textOverride = null) {
+  function send(textOverride = null){
     const name = usernameInput.value.trim() || "anonymous 🌿";
     const text = textOverride ?? msgInput.value.trim();
-    if (!text) return;
-    if (Date.now() - lastSent < COOLDOWN) return alert("Slow growth 🌱");
+    if(!text) return;
+    if(Date.now() - lastSent < COOLDOWN) return alert("Slow growth 🌱");
     lastSent = Date.now();
     messagesRef.push({ user: name, text, time: Date.now() });
     msgInput.value = "";
   }
+  msgInput.addEventListener("keydown", e=>{ if(e.key==="Enter") send(); });
 
-  msgInput.addEventListener("keydown", e => { if(e.key==="Enter") send(); });
-
-  // Listen for messages
-  messagesRef.limitToLast(100).on("value", snap => {
-    messagesDiv.innerHTML = "";
-    snap.forEach(c => {
+  messagesRef.limitToLast(100).on("value", snap=>{
+    messagesDiv.innerHTML="";
+    snap.forEach(c=>{
       const d = c.val();
       const div = document.createElement("div");
-      div.className = "msg";
-      if (d.text.startsWith("GIF:")) {
-        div.innerHTML = `<strong>${d.user}</strong><img class="gif" src="${d.text.slice(4)}"><div class="time">${new Date(d.time).toLocaleString()}</div>`;
+      div.className="msg";
+      if(d.text.startsWith("GIF:")){
+        div.innerHTML=`<strong>${d.user}</strong><img class="gif" src="${d.text.slice(4)}"><div class="time">${new Date(d.time).toLocaleString()}</div>`;
       } else {
-        div.innerHTML = `<strong>${d.user}</strong>: ${d.text}<div class="time">${new Date(d.time).toLocaleString()}</div>`;
+        div.innerHTML=`<strong>${d.user}</strong>: ${d.text}<div class="time">${new Date(d.time).toLocaleString()}</div>`;
       }
       messagesDiv.appendChild(div);
     });
-    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    messagesDiv.scrollTop=messagesDiv.scrollHeight;
   });
 
-  // GIF modal
+  // GIF
   const TENOR_KEY = "AIzaSyCCdf3VCa6WEo0PojZ8RRqWZ1FVeN7aLIU";
-
   function openGif(){ modal.style.display="flex"; results.innerHTML=""; }
   function closeGif(){ modal.style.display="none"; }
-
   function searchGif(){
     const q = document.getElementById("gifSearch").value.trim();
-    if (!q) return;
+    if(!q) return;
     fetch(`https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(q)}&key=${TENOR_KEY}&limit=12`)
-      .then(r => r.json())
-      .then(d => {
-        results.innerHTML = "";
-        d.results.forEach(g => {
-          const img = document.createElement("img");
-          img.src = g.media_formats.tinygif.url;
-          img.onclick = () => { send("GIF:" + g.media_formats.gif.url); closeGif(); };
+      .then(r=>r.json())
+      .then(d=>{
+        results.innerHTML="";
+        d.results.forEach(g=>{
+          const img=document.createElement("img");
+          img.src=g.media_formats.tinygif.url;
+          img.onclick=()=>{ send("GIF:"+g.media_formats.gif.url); closeGif(); };
           results.appendChild(img);
         });
       });
   }
+  document.getElementById("gifSearch").addEventListener("keydown", e=>{ if(e.key==="Enter") searchGif(); });
 
-  document.getElementById("gifSearch").addEventListener("keydown", e => { if(e.key==="Enter") searchGif(); });
+  // ---------------- Voice Chat ----------------
+  const voiceRef = firebase.database().ref("voiceSignals");
+  let localStream;
+  let peers={};
+  const voicesDiv=document.getElementById("voices");
+  const joinBtn=document.getElementById("joinBtn");
+  const leaveBtn=document.getElementById("leaveBtn");
+
+  joinBtn.onclick=async ()=>{
+    joinBtn.disabled=true; leaveBtn.disabled=false;
+    localStream=await navigator.mediaDevices.getUserMedia({ audio:true });
+    const audio=document.createElement("audio"); audio.autoplay=true; audio.srcObject=localStream; voicesDiv.appendChild(audio);
+    const myId="user_"+Math.random().toString(36).substr(2,5);
+
+    voiceRef.on("child_added", async snapshot=>{
+      const data=snapshot.val(); const sender=data.sender;
+      if(sender===myId) return;
+      let pc=peers[sender];
+      if(!pc){
+        pc=new RTCPeerConnection(); peers[sender]=pc;
+        localStream.getTracks().forEach(track=>pc.addTrack(track,localStream));
+        pc.ontrack=e=>{
+          let remoteAudio=document.getElementById("audio_"+sender);
+          if(!remoteAudio){
+            remoteAudio=document.createElement("audio"); remoteAudio.id="audio_"+sender; remoteAudio.autoplay=true; voicesDiv.appendChild(remoteAudio);
+          }
+          remoteAudio.srcObject=e.streams[0];
+        };
+      }
+      if(data.sdp){ await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
+        if(data.sdp.type==="offer"){ const answer=await pc.createAnswer(); await pc.setLocalDescription(answer); voiceRef.push({ sender:myId, sdp:answer }); }
+      }
+      if(data.ice){ try{await pc.addIceCandidate(data.ice);}catch(e){} }
+    });
+
+    const pc=new RTCPeerConnection(); peers[myId]=pc;
+    localStream.getTracks().forEach(track=>pc.addTrack(track,localStream));
+    pc.onicecandidate=e=>{ if(e.candidate) voiceRef.push({ sender:myId, ice:e.candidate }); };
+  };
+
+  leaveBtn.onclick=()=>{
+    leaveBtn.disabled=true; joinBtn.disabled=false;
+    Object.values(peers).forEach(pc=>pc.close());
+    peers={};
+    localStream.getTracks().forEach(track=>track.stop());
+    voicesDiv.innerHTML="";
+  };
 </script>
-
 </body>
-</html>
+</html
