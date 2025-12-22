@@ -94,12 +94,12 @@
   <h3>🌱 Changelog</h3>
   <ul>
     <li><strong>2025-12-22:</strong> Added GIF-enabled global chat (Tenor search) with cooldown and last 100 messages.</li>
-    <li><strong>2025-12-22:</strong> Added multi-user voice chat prototype using WebRTC + Firebase.</li>
+    <li><strong>2025-12-22:</strong> Added multi-user voice chat using WebRTC + Firebase.</li>
   </ul>
 </div>
 
 <script>
-  // Firebase initialization
+  // Firebase
   firebase.initializeApp({
     apiKey: "AIzaSyBQa3GnBvhAPPLGWjdzdBsrcZMexuaeuhY",
     authDomain: "youareanicehouseplant.firebaseapp.com",
@@ -121,14 +121,14 @@
   let lastSent = 0;
   const COOLDOWN = 3000;
 
-  function send(textOverride = null){
+  function send(textOverride=null){
     const name = usernameInput.value.trim() || "anonymous 🌿";
     const text = textOverride ?? msgInput.value.trim();
     if(!text) return;
-    if(Date.now() - lastSent < COOLDOWN) return alert("Slow growth 🌱");
+    if(Date.now()-lastSent<COOLDOWN) return alert("Slow growth 🌱");
     lastSent = Date.now();
-    messagesRef.push({ user: name, text, time: Date.now() });
-    msgInput.value = "";
+    messagesRef.push({ user:name, text, time:Date.now() });
+    msgInput.value="";
   }
   msgInput.addEventListener("keydown", e=>{ if(e.key==="Enter") send(); });
 
@@ -155,8 +155,7 @@
     const q=document.getElementById("gifSearch").value.trim();
     if(!q) return;
     fetch(`https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(q)}&key=${TENOR_KEY}&limit=12`)
-      .then(r=>r.json())
-      .then(d=>{
+      .then(r=>r.json()).then(d=>{
         results.innerHTML="";
         d.results.forEach(g=>{
           const img=document.createElement("img");
@@ -169,94 +168,94 @@
   document.getElementById("gifSearch").addEventListener("keydown", e=>{ if(e.key==="Enter") searchGif(); });
 
   // ---------------- Multi-user Voice Chat ----------------
-  const voiceRef = firebase.database().ref("voiceSignals");
-  let localStream;
-  let peers = {};
+  const myId="user_"+Math.random().toString(36).substr(2,5);
+  const voiceUsersRef = firebase.database().ref("voiceUsers");
+  const voiceSignalsRef = firebase.database().ref("voiceSignals");
   const voicesDiv = document.getElementById("voices");
   const joinBtn = document.getElementById("joinBtn");
   const leaveBtn = document.getElementById("leaveBtn");
-  const myId = "user_"+Math.random().toString(36).substr(2,5);
+  let localStream;
+  const peers={};
 
-  joinBtn.onclick = async ()=>{
+  function addRemoteAudio(userId, stream){
+    let audio=document.getElementById("audio_"+userId);
+    if(!audio){
+      audio=document.createElement("audio");
+      audio.id="audio_"+userId;
+      audio.autoplay=true;
+      voicesDiv.appendChild(audio);
+    }
+    audio.srcObject=stream;
+  }
+
+  joinBtn.onclick = async () => {
     joinBtn.disabled=true; leaveBtn.disabled=false;
     localStream = await navigator.mediaDevices.getUserMedia({ audio:true });
+    const selfAudio=document.createElement("audio"); selfAudio.autoplay=true; selfAudio.srcObject=localStream; voicesDiv.appendChild(selfAudio);
 
-    const audio=document.createElement("audio"); audio.autoplay=true; audio.srcObject=localStream; voicesDiv.appendChild(audio);
+    voiceUsersRef.child(myId).set(true);
+    voiceUsersRef.child(myId).onDisconnect().remove();
 
-    // Listen for incoming signals
-    voiceRef.on("child_added", async snapshot=>{
-      const data = snapshot.val();
-      const sender = data.sender;
-      if(sender===myId) return;
+    // Listen for signals
+    voiceSignalsRef.on("child_added", async snapshot=>{
+      const data=snapshot.val();
+      if(data.to!==myId) return;
 
-      let pc = peers[sender];
+      let pc=peers[data.from];
       if(!pc){
-        pc = new RTCPeerConnection();
-        peers[sender]=pc;
+        pc=new RTCPeerConnection();
+        peers[data.from]=pc;
         localStream.getTracks().forEach(track=>pc.addTrack(track,localStream));
-        pc.ontrack = e=>{
-          let remoteAudio=document.getElementById("audio_"+sender);
-          if(!remoteAudio){
-            remoteAudio=document.createElement("audio");
-            remoteAudio.id="audio_"+sender;
-            remoteAudio.autoplay=true;
-            voicesDiv.appendChild(remoteAudio);
-          }
-          remoteAudio.srcObject=e.streams[0];
-        };
-        pc.onicecandidate = ev=>{
-          if(ev.candidate) voiceRef.push({ sender: myId, ice: ev.candidate, target: sender });
+        pc.ontrack=e=>addRemoteAudio(data.from,e.streams[0]);
+        pc.onicecandidate=ev=>{
+          if(ev.candidate) voiceSignalsRef.push({ from: myId, to:data.from, ice:ev.candidate });
         };
       }
 
-      // Receive SDP
       if(data.sdp){
         await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
         if(data.sdp.type==="offer"){
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
-          voiceRef.push({ sender: myId, sdp: answer, target: sender });
+          voiceSignalsRef.push({ from: myId, to:data.from, sdp:answer });
         }
       }
 
-      // Receive ICE
-      if(data.ice && data.target===myId){
+      if(data.ice){
         try{ await pc.addIceCandidate(data.ice); } catch(e){console.log(e);}
       }
     });
 
     // Create offers to existing users
-    const existingUsers = Object.keys(peers);
-    existingUsers.forEach(async user=>{
-      const pc = new RTCPeerConnection();
-      peers[user]=pc;
-      localStream.getTracks().forEach(track=>pc.addTrack(track,localStream));
-      pc.ontrack = e=>{
-        let remoteAudio=document.getElementById("audio_"+user);
-        if(!remoteAudio){
-          remoteAudio=document.createElement("audio");
-          remoteAudio.id="audio_"+user;
-          remoteAudio.autoplay=true;
-          voicesDiv.appendChild(remoteAudio);
-        }
-        remoteAudio.srcObject=e.streams[0];
-      };
-      pc.onicecandidate = ev=>{
-        if(ev.candidate) voiceRef.push({ sender: myId, ice: ev.candidate, target: user });
-      };
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      voiceRef.push({ sender: myId, sdp: offer, target: user });
+    voiceUsersRef.once("value").then(snapshot=>{
+      snapshot.forEach(child=>{
+        const userId=child.key;
+        if(userId===myId) return;
+        if(peers[userId]) return;
+
+        const pc=new RTCPeerConnection();
+        peers[userId]=pc;
+        localStream.getTracks().forEach(track=>pc.addTrack(track,localStream));
+        pc.ontrack=e=>addRemoteAudio(userId,e.streams[0]);
+        pc.onicecandidate=ev=>{
+          if(ev.candidate) voiceSignalsRef.push({ from: myId, to:userId, ice:ev.candidate });
+        };
+        pc.createOffer().then(offer=>{
+          pc.setLocalDescription(offer).then(()=>voiceSignalsRef.push({ from: myId, to:userId, sdp:offer }));
+        });
+      });
     });
   };
 
   leaveBtn.onclick = ()=>{
     leaveBtn.disabled=true; joinBtn.disabled=false;
     Object.values(peers).forEach(pc=>pc.close());
-    peers={};
+    Object.keys(peers).forEach(k=>delete peers[k]);
     localStream.getTracks().forEach(track=>track.stop());
     voicesDiv.innerHTML="";
+    voiceUsersRef.child(myId).remove();
   };
 </script>
 </body>
 </html>
+
