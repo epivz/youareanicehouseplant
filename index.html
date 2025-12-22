@@ -9,140 +9,181 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
-  <!-- Google Fonts for Plant Chat -->
+  <!-- Google Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap" rel="stylesheet">
 
   <style>
     body { font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; }
-    #messages { border: 1px solid #ccc; padding: 10px; width: 100%; height: 250px; overflow-y: auto; margin-bottom: 10px; }
-    .msg { margin-bottom: 8px; }
-    .time { font-size: 11px; color: gray; }
-    #msg, #username { width: calc(100% - 20px); padding: 8px; margin-bottom: 5px; }
-    img { display: block; margin: 20px auto; }
-    button { padding: 8px 12px; }
 
-    /* Plant Chat font and style */
+    nav {
+      background-color: #2e7d32;
+      padding: 10px;
+      border-radius: 8px;
+      display: flex;
+      justify-content: space-around;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      margin-bottom: 20px;
+    }
+    nav a { color: white; text-decoration: none; font-weight: bold; }
+    nav a:hover { text-decoration: underline; }
+
+    #messages {
+      border: 1px solid #ccc;
+      padding: 10px;
+      height: 250px;
+      overflow-y: auto;
+      margin-bottom: 10px;
+    }
+
+    .msg { margin-bottom: 10px; }
+    .time { font-size: 11px; color: gray; }
+    .gif { max-width: 100%; max-height: 200px; display: block; margin-top: 6px; border-radius: 6px; }
+
+    #msg, #username { width: calc(100% - 20px); padding: 8px; margin-bottom: 5px; }
+    button { padding: 6px 10px; margin-right: 5px; }
+
     #plant-chat-title { font-family: 'Pacifico', cursive; color: green; }
     #plant-chat-container { border: 2px solid green; padding: 10px; border-radius: 10px; margin-top: 20px; }
 
-    /* Changelog styling */
     #changelog { border-top: 2px dashed green; padding-top: 10px; margin-top: 40px; }
     #changelog h3 { color: green; font-family: 'Pacifico', cursive; }
     #changelog ul { list-style-type: disc; padding-left: 20px; }
+
+    /* GIF Modal */
+    #gifModal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); align-items: center; justify-content: center; z-index: 999; }
+    #gifBox { background: white; padding: 10px; width: 90%; max-width: 400px; border-radius: 10px; }
+    #gifResults { display: grid; grid-template-columns: repeat(2,1fr); gap:6px; max-height:300px; overflow-y:auto; margin-top:8px; }
+    #gifResults img { width:100%; border-radius:6px; cursor:pointer; }
   </style>
 </head>
 
 <body>
 
+<nav>
+  <a href="#home">Home</a>
+  <a href="#plant-chat-container">Plant Chat</a>
+  <a href="#changelog">Changelog</a>
+</nav>
+
+<div id="home">
   <h1>There is no explanation</h1>
   <p>I can just feel it.</p>
-  <img src="houseplant.jpg" width="500" height="600">
+  <img src="houseplant.jpg" width="500">
   <p style="color:green;">made by me and AI (mostly)</p>
   <h1 style="color:rgb(21, 255, 0);">a side project of some sort</h1>
   <button onclick="alert('yo')">random button</button>
-  <h1>&#127793; another marvelous plant</h1>
-  <p style="text-align:center;">
-    thank you for visiting my beautiful website. Suggestions? DM epivz on any platform.
-  </p>
+  <h1>🌱 another marvelous plant</h1>
+  <p style="text-align:center;">thank you for visiting my beautiful website. Suggestions? DM epivz on any platform.</p>
+</div>
 
-  <!-- Plant Chat -->
-  <div id="plant-chat-container">
-    <h2 id="plant-chat-title">🌿 Plant Chat</h2>
-    <input id="username" placeholder="Your name"><br>
-    <div id="messages"></div>
-    <input id="msg" placeholder="Write a message">
-    <button onclick="send()">Send</button>
+<!-- Plant Chat -->
+<div id="plant-chat-container">
+  <h2 id="plant-chat-title">🌿 Plant Chat</h2>
+  <input id="username" placeholder="Your name">
+  <div id="messages"></div>
+  <input id="msg" placeholder="Write a message">
+  <button onclick="send()">Send</button>
+  <button onclick="openGif()">GIF</button>
+</div>
+
+<!-- GIF Modal -->
+<div id="gifModal">
+  <div id="gifBox">
+    <input id="gifSearch" placeholder="search gifs 🌱">
+    <button onclick="searchGif()">Search</button>
+    <div id="gifResults"></div>
+    <button onclick="closeGif()">close</button>
   </div>
+</div>
 
-  <!-- Changelog -->
-  <div id="changelog">
-    <h3>🌱 Changelog</h3>
-    <ul>
-      <li><strong>2025-12-22:</strong> Added Plant Chat with username memory, cooldown, message length limit, and last 100 messages.</li>
-    </ul>
-  </div>
+<!-- Changelog -->
+<div id="changelog">
+  <h3>🌱 Changelog</h3>
+  <ul>
+    <li><strong>2025-12-22:</strong> Added GIF-enabled global chat (Tenor search) with cooldown and last 100 messages.</li>
+  </ul>
+</div>
 
-  <script>
-    // Firebase config
-    const firebaseConfig = {
-      apiKey: "AIzaSyBQa3GnBvhAPPLGWjdzdBsrcZMexuaeuhY",
-      authDomain: "youareanicehouseplant.firebaseapp.com",
-      databaseURL: "https://youareanicehouseplant-default-rtdb.europe-west1.firebasedatabase.app",
-      projectId: "youareanicehouseplant",
-      storageBucket: "youareanicehouseplant.appspot.com",
-      messagingSenderId: "889517708282",
-      appId: "1:889517708282:web:f5768dbf0582db31f68a43"
-    };
+<script>
+  // Firebase
+  firebase.initializeApp({
+    apiKey: "AIzaSyBQa3GnBvhAPPLGWjdzdBsrcZMexuaeuhY",
+    authDomain: "youareanicehouseplant.firebaseapp.com",
+    databaseURL: "https://youareanicehouseplant-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "youareanicehouseplant",
+    storageBucket: "youareanicehouseplant.appspot.com",
+    messagingSenderId: "889517708282",
+    appId: "1:889517708282:web:f5768dbf0582db31f68a43"
+  });
 
-    // Initialize Firebase
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
-    const messagesRef = db.ref("messages");
+  const db = firebase.database();
+  const messagesRef = db.ref("messages");
 
-    const usernameInput = document.getElementById("username");
-    const msgInput = document.getElementById("msg");
-    const messagesDiv = document.getElementById("messages");
+  const usernameInput = document.getElementById("username");
+  const msgInput = document.getElementById("msg");
+  const messagesDiv = document.getElementById("messages");
+  const modal = document.getElementById("gifModal");
+  const results = document.getElementById("gifResults");
 
-    // --- Username memory ---
-    if (localStorage.getItem("chatUsername")) {
-      usernameInput.value = localStorage.getItem("chatUsername");
-    }
-    usernameInput.addEventListener("change", () => {
-      localStorage.setItem("chatUsername", usernameInput.value.trim());
-    });
+  let lastSent = 0;
+  const COOLDOWN = 3000;
 
-    // --- Message cooldown ---
-    let lastSent = 0; // timestamp in ms
-    const COOLDOWN = 3000; // 3 seconds
+  // Send message
+  function send(textOverride = null) {
+    const name = usernameInput.value.trim() || "anonymous 🌿";
+    const text = textOverride ?? msgInput.value.trim();
+    if (!text) return;
+    if (Date.now() - lastSent < COOLDOWN) return alert("Slow growth 🌱");
+    lastSent = Date.now();
+    messagesRef.push({ user: name, text, time: Date.now() });
+    msgInput.value = "";
+  }
 
-    // --- Send message function ---
-    window.send = function () {
-      const user = usernameInput.value.trim() || "anonymous 🌿";
-      const text = msgInput.value.trim();
+  msgInput.addEventListener("keydown", e => { if(e.key==="Enter") send(); });
 
-      if (!text) return alert("Message cannot be empty!");
-      if (text.length > 200) return alert("Message too long! Max 200 characters.");
-
-      const now = Date.now();
-      if (now - lastSent < COOLDOWN) {
-        return alert("Wait a few seconds before sending another message!");
+  // Listen for messages
+  messagesRef.limitToLast(100).on("value", snap => {
+    messagesDiv.innerHTML = "";
+    snap.forEach(c => {
+      const d = c.val();
+      const div = document.createElement("div");
+      div.className = "msg";
+      if (d.text.startsWith("GIF:")) {
+        div.innerHTML = `<strong>${d.user}</strong><img class="gif" src="${d.text.slice(4)}"><div class="time">${new Date(d.time).toLocaleString()}</div>`;
+      } else {
+        div.innerHTML = `<strong>${d.user}</strong>: ${d.text}<div class="time">${new Date(d.time).toLocaleString()}</div>`;
       }
-      lastSent = now;
-
-      messagesRef.push({
-        user: user,
-        text: text,
-        time: now
-      });
-
-      msgInput.value = "";
-    };
-
-    // Send on Enter key
-    msgInput.addEventListener("keydown", e => { if(e.key === "Enter") send(); });
-
-    // --- Listen for messages (last 100 only) ---
-    messagesRef.limitToLast(100).on("value", snapshot => {
-      messagesDiv.innerHTML = "";
-
-      snapshot.forEach(child => {
-        const data = child.val();
-        const date = new Date(data.time).toLocaleString();
-
-        const div = document.createElement("div");
-        div.className = "msg";
-        div.innerHTML =
-          "<strong>" + data.user + "</strong>: " +
-          data.text +
-          "<div class='time'>" + date + "</div>";
-
-        messagesDiv.appendChild(div);
-      });
-
-      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      messagesDiv.appendChild(div);
     });
-  </script>
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  });
+
+  // GIF modal
+  const TENOR_KEY = "AIzaSyCCdf3VCa6WEo0PojZ8RRqWZ1FVeN7aLIU";
+
+  function openGif(){ modal.style.display="flex"; results.innerHTML=""; }
+  function closeGif(){ modal.style.display="none"; }
+
+  function searchGif(){
+    const q = document.getElementById("gifSearch").value.trim();
+    if (!q) return;
+    fetch(`https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(q)}&key=${TENOR_KEY}&limit=12`)
+      .then(r => r.json())
+      .then(d => {
+        results.innerHTML = "";
+        d.results.forEach(g => {
+          const img = document.createElement("img");
+          img.src = g.media_formats.tinygif.url;
+          img.onclick = () => { send("GIF:" + g.media_formats.gif.url); closeGif(); };
+          results.appendChild(img);
+        });
+      });
+  }
+
+  document.getElementById("gifSearch").addEventListener("keydown", e => { if(e.key==="Enter") searchGif(); });
+</script>
 
 </body>
 </html>
-
