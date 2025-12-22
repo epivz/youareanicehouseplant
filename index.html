@@ -14,53 +14,35 @@
 
   <style>
     body { font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; }
-
-    nav {
-      background-color: #2e7d32;
-      padding: 10px;
-      border-radius: 8px;
-      display: flex;
-      justify-content: space-around;
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      margin-bottom: 20px;
-    }
+    nav { background-color: #2e7d32; padding: 10px; border-radius: 8px; display: flex; justify-content: space-around; position: sticky; top: 0; z-index: 100; margin-bottom: 20px; }
     nav a { color: white; text-decoration: none; font-weight: bold; }
     nav a:hover { text-decoration: underline; }
 
-    #messages {
-      border: 1px solid #ccc;
-      padding: 10px;
-      height: 250px;
-      overflow-y: auto;
-      margin-bottom: 10px;
-    }
-
+    #messages { border: 1px solid #ccc; padding: 10px; height: 250px; overflow-y: auto; margin-bottom: 10px; }
     .msg { margin-bottom: 10px; }
     .time { font-size: 11px; color: gray; }
     .gif { max-width: 100%; max-height: 200px; display: block; margin-top: 6px; border-radius: 6px; }
-
-    #msg, #username { width: calc(100% - 20px); padding: 8px; margin-bottom: 5px; }
+    #msg,#username { width: calc(100% - 20px); padding: 8px; margin-bottom: 5px; }
     button { padding: 6px 10px; margin-right: 5px; }
 
-    #plant-chat-title, #voice-chat-title { font-family: 'Pacifico', cursive; color: green; }
+    #plant-chat-title, #voice-chat-title { font-family:'Pacifico', cursive; color: green; }
     #plant-chat-container, #voice-chat-container { border: 2px solid green; padding: 10px; border-radius: 10px; margin-top: 20px; }
+    #voice-chat-container { min-height: 100px; }
 
     #changelog { border-top: 2px dashed green; padding-top: 10px; margin-top: 40px; }
     #changelog h3 { color: green; font-family: 'Pacifico', cursive; }
     #changelog ul { list-style-type: disc; padding-left: 20px; }
 
     /* GIF Modal */
-    #gifModal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); align-items: center; justify-content: center; z-index: 999; }
-    #gifBox { background: white; padding: 10px; width: 90%; max-width: 400px; border-radius: 10px; }
-    #gifResults { display: grid; grid-template-columns: repeat(2,1fr); gap:6px; max-height:300px; overflow-y:auto; margin-top:8px; }
+    #gifModal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); align-items:center; justify-content:center; z-index:999; }
+    #gifBox { background:white; padding:10px; width:90%; max-width:400px; border-radius:10px; }
+    #gifResults { display:grid; grid-template-columns:repeat(2,1fr); gap:6px; max-height:300px; overflow-y:auto; margin-top:8px; }
     #gifResults img { width:100%; border-radius:6px; cursor:pointer; }
+    #voices audio { display:block; margin-top:5px; width:100%; }
   </style>
 </head>
 
 <body>
-
 <nav>
   <a href="#home">Home</a>
   <a href="#plant-chat-container">Plant Chat</a>
@@ -112,12 +94,12 @@
   <h3>🌱 Changelog</h3>
   <ul>
     <li><strong>2025-12-22:</strong> Added GIF-enabled global chat (Tenor search) with cooldown and last 100 messages.</li>
-    <li><strong>2025-12-22:</strong> Added real-time voice chat prototype using WebRTC + Firebase.</li>
+    <li><strong>2025-12-22:</strong> Added multi-user voice chat prototype using WebRTC + Firebase.</li>
   </ul>
 </div>
 
 <script>
-  // Firebase
+  // Firebase initialization
   firebase.initializeApp({
     apiKey: "AIzaSyBQa3GnBvhAPPLGWjdzdBsrcZMexuaeuhY",
     authDomain: "youareanicehouseplant.firebaseapp.com",
@@ -131,13 +113,11 @@
   // ---------------- Text + GIF Chat ----------------
   const db = firebase.database();
   const messagesRef = db.ref("messages");
-
   const usernameInput = document.getElementById("username");
   const msgInput = document.getElementById("msg");
   const messagesDiv = document.getElementById("messages");
   const modal = document.getElementById("gifModal");
   const results = document.getElementById("gifResults");
-
   let lastSent = 0;
   const COOLDOWN = 3000;
 
@@ -155,8 +135,8 @@
   messagesRef.limitToLast(100).on("value", snap=>{
     messagesDiv.innerHTML="";
     snap.forEach(c=>{
-      const d = c.val();
-      const div = document.createElement("div");
+      const d=c.val();
+      const div=document.createElement("div");
       div.className="msg";
       if(d.text.startsWith("GIF:")){
         div.innerHTML=`<strong>${d.user}</strong><img class="gif" src="${d.text.slice(4)}"><div class="time">${new Date(d.time).toLocaleString()}</div>`;
@@ -168,12 +148,11 @@
     messagesDiv.scrollTop=messagesDiv.scrollHeight;
   });
 
-  // GIF
-  const TENOR_KEY = "AIzaSyCCdf3VCa6WEo0PojZ8RRqWZ1FVeN7aLIU";
+  const TENOR_KEY="AIzaSyCCdf3VCa6WEo0PojZ8RRqWZ1FVeN7aLIU";
   function openGif(){ modal.style.display="flex"; results.innerHTML=""; }
   function closeGif(){ modal.style.display="none"; }
   function searchGif(){
-    const q = document.getElementById("gifSearch").value.trim();
+    const q=document.getElementById("gifSearch").value.trim();
     if(!q) return;
     fetch(`https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(q)}&key=${TENOR_KEY}&limit=12`)
       .then(r=>r.json())
@@ -189,47 +168,89 @@
   }
   document.getElementById("gifSearch").addEventListener("keydown", e=>{ if(e.key==="Enter") searchGif(); });
 
-  // ---------------- Voice Chat ----------------
+  // ---------------- Multi-user Voice Chat ----------------
   const voiceRef = firebase.database().ref("voiceSignals");
   let localStream;
-  let peers={};
-  const voicesDiv=document.getElementById("voices");
-  const joinBtn=document.getElementById("joinBtn");
-  const leaveBtn=document.getElementById("leaveBtn");
+  let peers = {};
+  const voicesDiv = document.getElementById("voices");
+  const joinBtn = document.getElementById("joinBtn");
+  const leaveBtn = document.getElementById("leaveBtn");
+  const myId = "user_"+Math.random().toString(36).substr(2,5);
 
-  joinBtn.onclick=async ()=>{
+  joinBtn.onclick = async ()=>{
     joinBtn.disabled=true; leaveBtn.disabled=false;
-    localStream=await navigator.mediaDevices.getUserMedia({ audio:true });
-    const audio=document.createElement("audio"); audio.autoplay=true; audio.srcObject=localStream; voicesDiv.appendChild(audio);
-    const myId="user_"+Math.random().toString(36).substr(2,5);
+    localStream = await navigator.mediaDevices.getUserMedia({ audio:true });
 
+    const audio=document.createElement("audio"); audio.autoplay=true; audio.srcObject=localStream; voicesDiv.appendChild(audio);
+
+    // Listen for incoming signals
     voiceRef.on("child_added", async snapshot=>{
-      const data=snapshot.val(); const sender=data.sender;
+      const data = snapshot.val();
+      const sender = data.sender;
       if(sender===myId) return;
-      let pc=peers[sender];
+
+      let pc = peers[sender];
       if(!pc){
-        pc=new RTCPeerConnection(); peers[sender]=pc;
+        pc = new RTCPeerConnection();
+        peers[sender]=pc;
         localStream.getTracks().forEach(track=>pc.addTrack(track,localStream));
-        pc.ontrack=e=>{
+        pc.ontrack = e=>{
           let remoteAudio=document.getElementById("audio_"+sender);
           if(!remoteAudio){
-            remoteAudio=document.createElement("audio"); remoteAudio.id="audio_"+sender; remoteAudio.autoplay=true; voicesDiv.appendChild(remoteAudio);
+            remoteAudio=document.createElement("audio");
+            remoteAudio.id="audio_"+sender;
+            remoteAudio.autoplay=true;
+            voicesDiv.appendChild(remoteAudio);
           }
           remoteAudio.srcObject=e.streams[0];
         };
+        pc.onicecandidate = ev=>{
+          if(ev.candidate) voiceRef.push({ sender: myId, ice: ev.candidate, target: sender });
+        };
       }
-      if(data.sdp){ await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
-        if(data.sdp.type==="offer"){ const answer=await pc.createAnswer(); await pc.setLocalDescription(answer); voiceRef.push({ sender:myId, sdp:answer }); }
+
+      // Receive SDP
+      if(data.sdp){
+        await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
+        if(data.sdp.type==="offer"){
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          voiceRef.push({ sender: myId, sdp: answer, target: sender });
+        }
       }
-      if(data.ice){ try{await pc.addIceCandidate(data.ice);}catch(e){} }
+
+      // Receive ICE
+      if(data.ice && data.target===myId){
+        try{ await pc.addIceCandidate(data.ice); } catch(e){console.log(e);}
+      }
     });
 
-    const pc=new RTCPeerConnection(); peers[myId]=pc;
-    localStream.getTracks().forEach(track=>pc.addTrack(track,localStream));
-    pc.onicecandidate=e=>{ if(e.candidate) voiceRef.push({ sender:myId, ice:e.candidate }); };
+    // Create offers to existing users
+    const existingUsers = Object.keys(peers);
+    existingUsers.forEach(async user=>{
+      const pc = new RTCPeerConnection();
+      peers[user]=pc;
+      localStream.getTracks().forEach(track=>pc.addTrack(track,localStream));
+      pc.ontrack = e=>{
+        let remoteAudio=document.getElementById("audio_"+user);
+        if(!remoteAudio){
+          remoteAudio=document.createElement("audio");
+          remoteAudio.id="audio_"+user;
+          remoteAudio.autoplay=true;
+          voicesDiv.appendChild(remoteAudio);
+        }
+        remoteAudio.srcObject=e.streams[0];
+      };
+      pc.onicecandidate = ev=>{
+        if(ev.candidate) voiceRef.push({ sender: myId, ice: ev.candidate, target: user });
+      };
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      voiceRef.push({ sender: myId, sdp: offer, target: user });
+    });
   };
 
-  leaveBtn.onclick=()=>{
+  leaveBtn.onclick = ()=>{
     leaveBtn.disabled=true; joinBtn.disabled=false;
     Object.values(peers).forEach(pc=>pc.close());
     peers={};
@@ -238,4 +259,4 @@
   };
 </script>
 </body>
-</html
+</html>
