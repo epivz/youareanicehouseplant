@@ -27,7 +27,7 @@
 
     #plant-chat-title, #voice-chat-title { font-family:'Pacifico', cursive; color: green; }
     #plant-chat-container, #voice-chat-container { border: 2px solid green; padding: 10px; border-radius: 10px; margin-top: 20px; }
-    #voice-chat-container { min-height: 100px; }
+    #voice-chat-container { min-height: 420px; }
 
     #changelog { border-top: 2px dashed green; padding-top: 10px; margin-top: 40px; }
     #changelog h3 { color: green; font-family: 'Pacifico', cursive; }
@@ -38,7 +38,6 @@
     #gifBox { background:white; padding:10px; width:90%; max-width:400px; border-radius:10px; }
     #gifResults { display:grid; grid-template-columns:repeat(2,1fr); gap:6px; max-height:300px; overflow-y:auto; margin-top:8px; }
     #gifResults img { width:100%; border-radius:6px; cursor:pointer; }
-    #voices audio { display:block; margin-top:5px; width:100%; }
   </style>
 </head>
 
@@ -81,12 +80,10 @@
   </div>
 </div>
 
-<!-- Voice Chat -->
+<!-- Voice Chat via Jitsi -->
 <div id="voice-chat-container">
   <h2 id="voice-chat-title">🎙 Plant Voice Chat</h2>
-  <button id="joinBtn">Join Voice Chat</button>
-  <button id="leaveBtn" disabled>Leave Voice Chat</button>
-  <div id="voices"></div>
+  <div id="jitsi-container" style="width:100%; height:400px; border-radius:10px;"></div>
 </div>
 
 <!-- Changelog -->
@@ -94,7 +91,7 @@
   <h3>🌱 Changelog</h3>
   <ul>
     <li><strong>2025-12-22:</strong> Added GIF-enabled global chat (Tenor search) with cooldown and last 100 messages.</li>
-    <li><strong>2025-12-22:</strong> Added multi-user voice chat using WebRTC + Firebase.</li>
+    <li><strong>2025-12-22:</strong> Added multi-user voice chat via Jitsi Meet iFrame.</li>
   </ul>
 </div>
 
@@ -166,93 +163,25 @@
       });
   }
   document.getElementById("gifSearch").addEventListener("keydown", e=>{ if(e.key==="Enter") searchGif(); });
+</script>
 
-  // ---------------- Multi-user Voice Chat ----------------
-  const myId="user_"+Math.random().toString(36).substr(2,5);
-  const voiceUsersRef = firebase.database().ref("voiceUsers");
-  const voiceSignalsRef = firebase.database().ref("voiceSignals");
-  const voicesDiv = document.getElementById("voices");
-  const joinBtn = document.getElementById("joinBtn");
-  const leaveBtn = document.getElementById("leaveBtn");
-  let localStream;
-  const peers={};
-
-  function addRemoteAudio(userId, stream){
-    let audio=document.getElementById("audio_"+userId);
-    if(!audio){
-      audio=document.createElement("audio");
-      audio.id="audio_"+userId;
-      audio.autoplay=true;
-      voicesDiv.appendChild(audio);
-    }
-    audio.srcObject=stream;
-  }
-
-  joinBtn.onclick = async () => {
-    joinBtn.disabled=true; leaveBtn.disabled=false;
-    localStream = await navigator.mediaDevices.getUserMedia({ audio:true });
-    const selfAudio=document.createElement("audio"); selfAudio.autoplay=true; selfAudio.srcObject=localStream; voicesDiv.appendChild(selfAudio);
-
-    voiceUsersRef.child(myId).set(true);
-    voiceUsersRef.child(myId).onDisconnect().remove();
-
-    voiceSignalsRef.on("child_added", async snapshot=>{
-      const data=snapshot.val();
-      if(data.to!==myId) return;
-
-      let pc=peers[data.from];
-      if(!pc){
-        pc=new RTCPeerConnection();
-        peers[data.from]=pc;
-        localStream.getTracks().forEach(track=>pc.addTrack(track,localStream));
-        pc.ontrack=e=>addRemoteAudio(data.from,e.streams[0]);
-        pc.onicecandidate=ev=>{
-          if(ev.candidate) voiceSignalsRef.push({ from: myId, to:data.from, ice:ev.candidate });
-        };
-      }
-
-      if(data.sdp){
-        await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
-        if(data.sdp.type==="offer"){
-          const answer = await pc.createAnswer();
-          await pc.setLocalDescription(answer);
-          voiceSignalsRef.push({ from: myId, to:data.from, sdp:answer });
-        }
-      }
-
-      if(data.ice){
-        try{ await pc.addIceCandidate(data.ice); } catch(e){console.log(e);}
-      }
-    });
-
-    voiceUsersRef.once("value").then(snapshot=>{
-      snapshot.forEach(child=>{
-        const userId=child.key;
-        if(userId===myId) return;
-        if(peers[userId]) return;
-
-        const pc=new RTCPeerConnection();
-        peers[userId]=pc;
-        localStream.getTracks().forEach(track=>pc.addTrack(track,localStream));
-        pc.ontrack=e=>addRemoteAudio(userId,e.streams[0]);
-        pc.onicecandidate=ev=>{
-          if(ev.candidate) voiceSignalsRef.push({ from: myId, to:userId, ice:ev.candidate });
-        };
-        pc.createOffer().then(offer=>{
-          pc.setLocalDescription(offer).then(()=>voiceSignalsRef.push({ from: myId, to:userId, sdp:offer }));
-        });
-      });
-    });
+<!-- Jitsi Meet integration -->
+<script src='https://meet.jit.si/external_api.js'></script>
+<script>
+  const domain = "meet.jit.si";
+  const options = {
+      roomName: "YouAreANiceHouseplantRoom",
+      parentNode: document.getElementById('jitsi-container'),
+      width: '100%',
+      height: 400,
+      configOverwrite: { startWithVideoMuted: true, startWithAudioMuted: false },
+      interfaceConfigOverwrite: { TOOLBAR_BUTTONS: ['microphone','hangup','chat'] }
   };
+  const api = new JitsiMeetExternalAPI(domain, options);
 
-  leaveBtn.onclick = () => {
-    leaveBtn.disabled=true; joinBtn.disabled=false;
-    Object.values(peers).forEach(pc=>pc.close());
-    Object.keys(peers).forEach(k=>delete peers[k]);
-    localStream.getTracks().forEach(track=>track.stop());
-    voicesDiv.innerHTML="";
-    voiceUsersRef.child(myId).remove();
-  };
+  api.addEventListener('videoConferenceJoined', () => {
+      console.log("Joined Plant Voice Chat!");
+  });
 </script>
 </body>
 </html>
