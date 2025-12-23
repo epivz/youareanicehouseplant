@@ -17,31 +17,27 @@
     nav { background-color: #2e7d32; padding: 10px; border-radius: 8px; display: flex; justify-content: space-around; position: sticky; top: 0; z-index: 100; margin-bottom: 20px; }
     nav a { color: white; text-decoration: none; font-weight: bold; }
     nav a:hover { text-decoration: underline; }
-
     #messages { border: 1px solid #ccc; padding: 10px; height: 250px; overflow-y: auto; margin-bottom: 10px; }
     .msg { margin-bottom: 10px; }
     .time { font-size: 11px; color: gray; }
     .gif { max-width: 100%; max-height: 200px; display: block; margin-top: 6px; border-radius: 6px; }
     #msg,#username { width: calc(100% - 20px); padding: 8px; margin-bottom: 5px; }
-    button { padding: 6px 10px; margin-right: 5px; }
-
-    #plant-chat-title, #voice-chat-title { font-family:'Pacifico', cursive; color: green; }
+    button { padding: 4px 8px; margin-left: 4px; cursor: pointer; }
+    #plant-chat-title, #voice-chat-title, #changelog h3 { font-family:'Pacifico', cursive; color: green; }
     #plant-chat-container, #voice-chat-container { border: 2px solid green; padding: 10px; border-radius: 10px; margin-top: 20px; }
     #voice-chat-container { min-height: 420px; }
-
     #changelog { border-top: 2px dashed green; padding-top: 10px; margin-top: 40px; }
-    #changelog h3 { color: green; font-family: 'Pacifico', cursive; }
-    #changelog ul { list-style-type: disc; padding-left: 20px; }
-
-    /* GIF Modal */
     #gifModal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); align-items:center; justify-content:center; z-index:999; }
     #gifBox { background:white; padding:10px; width:90%; max-width:400px; border-radius:10px; }
     #gifResults { display:grid; grid-template-columns:repeat(2,1fr); gap:6px; max-height:300px; overflow-y:auto; margin-top:8px; }
     #gifResults img { width:100%; border-radius:6px; cursor:pointer; }
+    #notif { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#2e7d32; color:white; padding:8px 14px; border-radius:20px; display:none; font-size:14px; z-index:1000; }
   </style>
 </head>
 
 <body>
+<div id="notif"></div>
+
 <nav>
   <a href="#home">Home</a>
   <a href="#plant-chat-container">Plant Chat</a>
@@ -68,6 +64,9 @@
   <input id="msg" placeholder="Write a message">
   <button onclick="send()">Send</button>
   <button onclick="openGif()">GIF</button>
+  <br><br>
+  <input type="file" id="imageInput" accept="image/*">
+  <button onclick="sendImage()">Send Image</button>
 </div>
 
 <!-- GIF Modal -->
@@ -80,7 +79,7 @@
   </div>
 </div>
 
-<!-- Voice Chat via Jitsi -->
+<!-- Voice Chat -->
 <div id="voice-chat-container">
   <h2 id="voice-chat-title">🎙 Plant Voice Chat</h2>
   <div id="jitsi-container" style="width:100%; height:400px; border-radius:10px;"></div>
@@ -90,24 +89,22 @@
 <div id="changelog">
   <h3>🌱 Changelog</h3>
   <ul>
-    <li><strong>2025-12-22:</strong> Added GIF-enabled global chat (Tenor search) with cooldown and last 100 messages.</li>
-    <li><strong>2025-12-22:</strong> Added multi-user voice chat via Jitsi Meet iFrame.</li>
+    <li><strong>2025-12-22:</strong> Added global Plant Chat.</li>
+    <li><strong>2025-12-22:</strong> Added GIF chat.</li>
+    <li><strong>2025-12-22:</strong> Added voice chat.</li>
+    <li><strong>2025-12-23:</strong> Added edit/delete messages.</li>
+    <li><strong>2025-12-23:</strong> Added message notifications.</li>
+    <li><strong>2025-12-23:</strong> Added image upload without Firebase Storage.</li>
   </ul>
 </div>
 
 <script>
-  // Firebase initialization
+  // Initialize Firebase
   firebase.initializeApp({
     apiKey: "AIzaSyBQa3GnBvhAPPLGWjdzdBsrcZMexuaeuhY",
-    authDomain: "youareanicehouseplant.firebaseapp.com",
-    databaseURL: "https://youareanicehouseplant-default-rtdb.europe-west1.firebasedatabase.app",
-    projectId: "youareanicehouseplant",
-    storageBucket: "youareanicehouseplant.appspot.com",
-    messagingSenderId: "889517708282",
-    appId: "1:889517708282:web:f5768dbf0582db31f68a43"
+    databaseURL: "https://youareanicehouseplant-default-rtdb.europe-west1.firebasedatabase.app"
   });
 
-  // ---------------- Text + GIF Chat ----------------
   const db = firebase.database();
   const messagesRef = db.ref("messages");
   const usernameInput = document.getElementById("username");
@@ -115,36 +112,94 @@
   const messagesDiv = document.getElementById("messages");
   const modal = document.getElementById("gifModal");
   const results = document.getElementById("gifResults");
-  let lastSent = 0;
   const COOLDOWN = 3000;
+  let lastSent = 0;
+  let userId = localStorage.getItem("plantUID");
+  if(!userId){ userId = Math.random().toString(36).slice(2); localStorage.setItem("plantUID", userId); }
 
+  function showNotif(text){
+    const n = document.getElementById("notif");
+    n.textContent = text;
+    n.style.display = "block";
+    clearTimeout(n._t);
+    n._t = setTimeout(()=>n.style.display="none",1800);
+  }
+
+  // Send text message
   function send(textOverride=null){
     const name = usernameInput.value.trim() || "anonymous 🌿";
     const text = textOverride ?? msgInput.value.trim();
     if(!text) return;
-    if(Date.now()-lastSent<COOLDOWN) return alert("Slow growth 🌱");
+    if(Date.now()-lastSent < COOLDOWN){ showNotif("Slow growth 🌱"); return; }
     lastSent = Date.now();
-    messagesRef.push({ user:name, text, time:Date.now() });
+    messagesRef.push({ user:name, uid:userId, text, time:Date.now() });
     msgInput.value="";
+    showNotif("Message sent 🌱");
   }
+
+  // Send image without Firebase Storage
+  function sendImage(){
+    const fileInput = document.getElementById("imageInput");
+    const file = fileInput.files[0];
+    if(!file) return showNotif("Select an image first 🌱");
+
+    const name = usernameInput.value.trim() || "anonymous 🌿";
+    const reader = new FileReader();
+    reader.onload = function(e){
+      const base64 = e.target.result;
+      messagesRef.push({ user: name, uid: userId, text: "IMAGE:" + base64, time: Date.now() });
+      fileInput.value = "";
+      showNotif("Image sent 🌱");
+    };
+    reader.readAsDataURL(file);
+  }
+
   msgInput.addEventListener("keydown", e=>{ if(e.key==="Enter") send(); });
 
-  messagesRef.limitToLast(100).on("value", snap=>{
-    messagesDiv.innerHTML="";
-    snap.forEach(c=>{
-      const d=c.val();
-      const div=document.createElement("div");
-      div.className="msg";
-      if(d.text.startsWith("GIF:")){
-        div.innerHTML=`<strong>${d.user}</strong><img class="gif" src="${d.text.slice(4)}"><div class="time">${new Date(d.time).toLocaleString()}</div>`;
-      } else {
-        div.innerHTML=`<strong>${d.user}</strong>: ${d.text}<div class="time">${new Date(d.time).toLocaleString()}</div>`;
-      }
-      messagesDiv.appendChild(div);
-    });
-    messagesDiv.scrollTop=messagesDiv.scrollHeight;
+  // Track messages for notifications
+  let loadedKeys = new Set();
+  messagesRef.limitToLast(100).once("value").then(snap=>{
+    snap.forEach(c => loadedKeys.add(c.key));
+    snap.forEach(c=> appendMessage(c.key, c.val()));
   });
 
+  messagesRef.limitToLast(100).on("child_added", snap=>{
+    const d = snap.val();
+    const key = snap.key;
+    if(loadedKeys.has(key)) return;
+    loadedKeys.add(key);
+    appendMessage(key,d);
+    if(d.uid !== userId) showNotif(`${d.user} sent a message 🌱`);
+  });
+
+  function appendMessage(key,d){
+    const div = document.createElement("div");
+    div.className = "msg";
+    let controls = "";
+    if(d.uid === userId){
+      controls = `<button onclick="deleteMsg('${key}')">🗑</button>
+                  <button onclick="editMsg('${key}','${encodeURIComponent(d.text)}')">✏️</button>`;
+    }
+    if(d.text.startsWith("GIF:")){
+      div.innerHTML = `<strong>${d.user}</strong> ${controls}
+        <img class="gif" src="${d.text.slice(4)}">
+        <div class="time">${new Date(d.time).toLocaleString()}</div>`;
+    } else if(d.text.startsWith("IMAGE:")){
+      div.innerHTML = `<strong>${d.user}</strong> ${controls}
+        <img class="gif" src="${d.text.slice(6)}">
+        <div class="time">${new Date(d.time).toLocaleString()}</div>`;
+    } else {
+      div.innerHTML = `<strong>${d.user}</strong>: ${d.text} ${controls}
+        <div class="time">${new Date(d.time).toLocaleString()}${d.edited?" (edited)":""}</div>`;
+    }
+    messagesDiv.appendChild(div);
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  }
+
+  function deleteMsg(key){ if(confirm("Delete this message? 🌱")){ messagesRef.child(key).remove(); showNotif("Message deleted 🪴"); } }
+  function editMsg(key, oldText){ const t=decodeURIComponent(oldText); if(t.startsWith("GIF:")||t.startsWith("IMAGE:")) return showNotif("Media can't be edited 🌿"); const n=prompt("Edit your message 🌱", t); if(n && n.trim()){ messagesRef.child(key).update({ text:n.trim(), edited:true }); showNotif("Message edited ✏️"); } }
+
+  // GIF functions
   const TENOR_KEY="AIzaSyCCdf3VCa6WEo0PojZ8RRqWZ1FVeN7aLIU";
   function openGif(){ modal.style.display="flex"; results.innerHTML=""; }
   function closeGif(){ modal.style.display="none"; }
@@ -162,28 +217,17 @@
         });
       });
   }
-  document.getElementById("gifSearch").addEventListener("keydown", e=>{ if(e.key==="Enter") searchGif(); });
 </script>
 
-<!-- Jitsi Meet integration -->
-<script src='https://meet.jit.si/external_api.js'></script>
+<script src="https://meet.jit.si/external_api.js"></script>
 <script>
-  const domain = "meet.jit.si";
-  const options = {
-      roomName: "YouAreANiceHouseplantRoom",
-      parentNode: document.getElementById('jitsi-container'),
-      width: '100%',
-      height: 400,
-      configOverwrite: { startWithVideoMuted: true, startWithAudioMuted: false },
-      interfaceConfigOverwrite: { TOOLBAR_BUTTONS: ['microphone','hangup','chat'] }
-  };
-  const api = new JitsiMeetExternalAPI(domain, options);
-
-  api.addEventListener('videoConferenceJoined', () => {
-      console.log("Joined Plant Voice Chat!");
+  new JitsiMeetExternalAPI("meet.jit.si",{
+    roomName:"YouAreANiceHouseplantRoom",
+    parentNode:document.getElementById("jitsi-container"),
+    configOverwrite:{ startWithVideoMuted:true }
   });
 </script>
+
 </body>
 </html>
-
 
