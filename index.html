@@ -2,6 +2,8 @@
 <html>
 <head>
   <title>You are a nice houseplant</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
   <link rel="icon" href="images/favicon.ico" type="image/x-icon">
   <link rel="shortcut icon" href="images/favicon.ico">
 
@@ -13,24 +15,76 @@
   <link href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap" rel="stylesheet">
 
   <style>
-    body { font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; }
-    nav { background-color: #2e7d32; padding: 10px; border-radius: 8px; display: flex; justify-content: space-around; position: sticky; top: 0; z-index: 100; margin-bottom: 20px; }
-    nav a { color: white; text-decoration: none; font-weight: bold; }
-    nav a:hover { text-decoration: underline; }
-    #messages { border: 1px solid #ccc; padding: 10px; height: 250px; overflow-y: auto; margin-bottom: 10px; }
+    body { 
+      font-family: Arial, sans-serif; 
+      max-width: 100%; 
+      margin: auto; 
+      padding: 10px; 
+      box-sizing: border-box; 
+    }
+
+    nav { 
+      background-color: #2e7d32; 
+      padding: 10px; 
+      border-radius: 8px; 
+      display: flex; 
+      justify-content: space-around; 
+      flex-wrap: wrap; 
+      gap: 4px;
+      position: sticky; 
+      top: 0; 
+      z-index: 100; 
+      margin-bottom: 20px; 
+    }
+
+    nav a { 
+      color: white; 
+      text-decoration: none; 
+      font-weight: bold; 
+      flex: 1 1 48%; 
+      text-align: center; 
+      margin: 2px 0;
+    }
+
+    #messages { 
+      border: 1px solid #ccc; 
+      padding: 10px; 
+      height: 250px; 
+      overflow-y: auto; 
+      margin-bottom: 10px; 
+    }
+
     .msg { margin-bottom: 10px; }
     .time { font-size: 11px; color: gray; }
     .gif { max-width: 100%; max-height: 200px; display: block; margin-top: 6px; border-radius: 6px; }
-    #msg,#username { width: calc(100% - 20px); padding: 8px; margin-bottom: 5px; }
-    button { padding: 4px 8px; margin-left: 4px; cursor: pointer; }
+
+    #msg,#username,#imageInput,#videoInput { 
+      width: 100%; 
+      box-sizing: border-box; 
+      padding: 8px; 
+      margin-bottom: 5px; 
+    }
+
+    button { padding: 4px 8px; margin-top: 4px; width: 100%; cursor: pointer; }
+
     #plant-chat-title, #voice-chat-title, #changelog h3 { font-family:'Pacifico', cursive; color: green; }
-    #plant-chat-container, #voice-chat-container { border: 2px solid green; padding: 10px; border-radius: 10px; margin-top: 20px; }
+
+    #plant-chat-container, #voice-chat-container { 
+      border: 2px solid green; 
+      padding: 10px; 
+      border-radius: 10px; 
+      margin-top: 20px; 
+    }
+
     #voice-chat-container { min-height: 420px; }
+
     #changelog { border-top: 2px dashed green; padding-top: 10px; margin-top: 40px; }
+
     #gifModal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); align-items:center; justify-content:center; z-index:999; }
-    #gifBox { background:white; padding:10px; width:90%; max-width:400px; border-radius:10px; }
+    #gifBox { background:white; padding:10px; width:95%; max-width:400px; border-radius:10px; }
     #gifResults { display:grid; grid-template-columns:repeat(2,1fr); gap:6px; max-height:300px; overflow-y:auto; margin-top:8px; }
     #gifResults img { width:100%; border-radius:6px; cursor:pointer; }
+
     #notif { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#2e7d32; color:white; padding:8px 14px; border-radius:20px; display:none; font-size:14px; z-index:1000; }
   </style>
 </head>
@@ -46,7 +100,7 @@
 </nav>
 
 <div id="home">
-  <h1>There is no explanation you are just a a nice houseplant</h1>
+  <h1>There is no explanation</h1>
   <p>I can just feel it.</p>
   <img src="houseplant.jpg" width="500">
   <p style="color:green;">made by me and AI (mostly)</p>
@@ -64,9 +118,13 @@
   <input id="msg" placeholder="Write a message">
   <button onclick="send()">Send</button>
   <button onclick="openGif()">GIF</button>
-  <br><br>
+
   <input type="file" id="imageInput" accept="image/*">
   <button onclick="sendImage()">Send Image</button>
+
+  <!-- ✅ VIDEO -->
+  <input type="file" id="videoInput" accept="video/mp4,video/webm">
+  <button onclick="sendVideo()">Send Short Video (≤3MB)</button>
 </div>
 
 <!-- GIF Modal -->
@@ -94,12 +152,13 @@
     <li><strong>2025-12-22:</strong> Added voice chat.</li>
     <li><strong>2025-12-23:</strong> Added edit/delete messages.</li>
     <li><strong>2025-12-23:</strong> Added message notifications.</li>
-    <li><strong>2025-12-23:</strong> Added image upload without Firebase Storage.</li>
+    <li><strong>2025-12-23:</strong> Added image upload (Base64).</li>
+    <li><strong>2025-12-23:</strong> Responsive design for mobile devices.</li>
+    <li><strong>2025-12-24:</strong> Added short video sending (≤3MB).</li>
   </ul>
 </div>
 
 <script>
-  // Initialize Firebase
   firebase.initializeApp({
     apiKey: "AIzaSyBQa3GnBvhAPPLGWjdzdBsrcZMexuaeuhY",
     databaseURL: "https://youareanicehouseplant-default-rtdb.europe-west1.firebasedatabase.app"
@@ -110,12 +169,15 @@
   const usernameInput = document.getElementById("username");
   const msgInput = document.getElementById("msg");
   const messagesDiv = document.getElementById("messages");
-  const modal = document.getElementById("gifModal");
-  const results = document.getElementById("gifResults");
+
   const COOLDOWN = 3000;
   let lastSent = 0;
+
   let userId = localStorage.getItem("plantUID");
-  if(!userId){ userId = Math.random().toString(36).slice(2); localStorage.setItem("plantUID", userId); }
+  if(!userId){
+    userId = Math.random().toString(36).slice(2);
+    localStorage.setItem("plantUID", userId);
+  }
 
   function showNotif(text){
     const n = document.getElementById("notif");
@@ -125,7 +187,6 @@
     n._t = setTimeout(()=>n.style.display="none",1800);
   }
 
-  // Send text message
   function send(textOverride=null){
     const name = usernameInput.value.trim() || "anonymous 🌿";
     const text = textOverride ?? msgInput.value.trim();
@@ -134,89 +195,55 @@
     lastSent = Date.now();
     messagesRef.push({ user:name, uid:userId, text, time:Date.now() });
     msgInput.value="";
-    showNotif("Message sent 🌱");
   }
 
-  // Send image without Firebase Storage
   function sendImage(){
-    const fileInput = document.getElementById("imageInput");
-    const file = fileInput.files[0];
-    if(!file) return showNotif("Select an image first 🌱");
-
-    const name = usernameInput.value.trim() || "anonymous 🌿";
-    const reader = new FileReader();
-    reader.onload = function(e){
-      const base64 = e.target.result;
-      messagesRef.push({ user: name, uid: userId, text: "IMAGE:" + base64, time: Date.now() });
-      fileInput.value = "";
-      showNotif("Image sent 🌱");
+    const file = imageInput.files[0];
+    if(!file) return showNotif("Select an image 🌱");
+    const r = new FileReader();
+    r.onload = e=>{
+      messagesRef.push({ user:usernameInput.value||"anonymous 🌿", uid:userId, text:"IMAGE:"+e.target.result, time:Date.now() });
+      imageInput.value="";
     };
-    reader.readAsDataURL(file);
+    r.readAsDataURL(file);
   }
 
-  msgInput.addEventListener("keydown", e=>{ if(e.key==="Enter") send(); });
+  function sendVideo(){
+    const file = videoInput.files[0];
+    if(!file) return showNotif("Select a video 🌱");
+    if(file.size > 3*1024*1024) return showNotif("Video too big 🌱 (max 3MB)");
+    if(Date.now()-lastSent < COOLDOWN){ showNotif("Slow growth 🌱"); return; }
+    lastSent = Date.now();
+    const r = new FileReader();
+    r.onload = e=>{
+      messagesRef.push({ user:usernameInput.value||"anonymous 🌿", uid:userId, text:"VIDEO:"+e.target.result, time:Date.now() });
+      videoInput.value="";
+      showNotif("Video sent 🎥🌱");
+    };
+    r.readAsDataURL(file);
+  }
 
-  // Track messages for notifications
-  let loadedKeys = new Set();
-  messagesRef.limitToLast(100).once("value").then(snap=>{
-    snap.forEach(c => loadedKeys.add(c.key));
-    snap.forEach(c=> appendMessage(c.key, c.val()));
-  });
-
-  messagesRef.limitToLast(100).on("child_added", snap=>{
+  messagesRef.limitToLast(100).on("child_added",snap=>{
     const d = snap.val();
-    const key = snap.key;
-    if(loadedKeys.has(key)) return;
-    loadedKeys.add(key);
-    appendMessage(key,d);
-    if(d.uid !== userId) showNotif(`${d.user} sent a message 🌱`);
-  });
-
-  function appendMessage(key,d){
     const div = document.createElement("div");
-    div.className = "msg";
-    let controls = "";
-    if(d.uid === userId){
-      controls = `<button onclick="deleteMsg('${key}')">🗑</button>
-                  <button onclick="editMsg('${key}','${encodeURIComponent(d.text)}')">✏️</button>`;
-    }
+    div.className="msg";
+
     if(d.text.startsWith("GIF:")){
-      div.innerHTML = `<strong>${d.user}</strong> ${controls}
-        <img class="gif" src="${d.text.slice(4)}">
-        <div class="time">${new Date(d.time).toLocaleString()}</div>`;
+      div.innerHTML=`<strong>${d.user}</strong><img class="gif" src="${d.text.slice(4)}">`;
     } else if(d.text.startsWith("IMAGE:")){
-      div.innerHTML = `<strong>${d.user}</strong> ${controls}
-        <img class="gif" src="${d.text.slice(6)}">
-        <div class="time">${new Date(d.time).toLocaleString()}</div>`;
+      div.innerHTML=`<strong>${d.user}</strong><img class="gif" src="${d.text.slice(6)}">`;
+    } else if(d.text.startsWith("VIDEO:")){
+      div.innerHTML=`<strong>${d.user}</strong>
+        <video class="gif" controls muted playsinline>
+          <source src="${d.text.slice(6)}">
+        </video>`;
     } else {
-      div.innerHTML = `<strong>${d.user}</strong>: ${d.text} ${controls}
-        <div class="time">${new Date(d.time).toLocaleString()}${d.edited?" (edited)":""}</div>`;
+      div.innerHTML=`<strong>${d.user}</strong>: ${d.text}`;
     }
+
     messagesDiv.appendChild(div);
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
-  }
-
-  function deleteMsg(key){ if(confirm("Delete this message? 🌱")){ messagesRef.child(key).remove(); showNotif("Message deleted 🪴"); } }
-  function editMsg(key, oldText){ const t=decodeURIComponent(oldText); if(t.startsWith("GIF:")||t.startsWith("IMAGE:")) return showNotif("Media can't be edited 🌿"); const n=prompt("Edit your message 🌱", t); if(n && n.trim()){ messagesRef.child(key).update({ text:n.trim(), edited:true }); showNotif("Message edited ✏️"); } }
-
-  // GIF functions
-  const TENOR_KEY="AIzaSyCCdf3VCa6WEo0PojZ8RRqWZ1FVeN7aLIU";
-  function openGif(){ modal.style.display="flex"; results.innerHTML=""; }
-  function closeGif(){ modal.style.display="none"; }
-  function searchGif(){
-    const q=document.getElementById("gifSearch").value.trim();
-    if(!q) return;
-    fetch(`https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(q)}&key=${TENOR_KEY}&limit=12`)
-      .then(r=>r.json()).then(d=>{
-        results.innerHTML="";
-        d.results.forEach(g=>{
-          const img=document.createElement("img");
-          img.src=g.media_formats.tinygif.url;
-          img.onclick=()=>{ send("GIF:"+g.media_formats.gif.url); closeGif(); };
-          results.appendChild(img);
-        });
-      });
-  }
+  });
 </script>
 
 <script src="https://meet.jit.si/external_api.js"></script>
