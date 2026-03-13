@@ -1,2 +1,2 @@
 # youareanicehouseplant
-random project
+my personal website
