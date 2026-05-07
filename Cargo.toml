@@ -1,0 +1,65 @@
+[package]
+name = "datamesh"
+version = "0.1.0"
+edition = "2021"
+description = "A decentralized P2P file mesh for personal devices — sync files across all your devices without a corporate middleman"
+license = "MIT"
+readme = "README.md"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+futures = "0.3"
+
+# P2P networking
+libp2p = { version = "0.54", features = [
+    "tokio",
+    "noise",
+    "yamux",
+    "tcp",
+    "mdns",
+    "request-response",
+    "identify",
+    "macros",
+    "cbor",
+] }
+
+# Storage
+rusqlite = { version = "0.31", features = ["bundled"] }
+
+# Cryptography / hashing
+blake3 = "1"
+
+# CLI
+clap = { version = "4", features = ["derive", "env"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_cbor = "0.11"
+
+# File watching
+notify = "7"
+
+# Telemetry
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+opentelemetry = "0.27"
+opentelemetry_sdk = { version = "0.27", features = ["rt-tokio"] }
+tracing-opentelemetry = "0.28"
+
+# Utilities
+uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+anyhow = "1"
+thiserror = "2"
+dirs = "6"
+hex = "0.4"
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
